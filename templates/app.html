@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Stylist - App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="min-h-screen bg-slate-100 text-slate-900">
+    <main class="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+      <section class="rounded-2xl bg-white p-6 shadow-sm sm:p-8">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">AI Stylist</p>
+            <h1 class="mt-2 text-3xl font-bold sm:text-4xl">Image Upload and Analysis</h1>
+            <p class="mt-3 max-w-2xl text-slate-600">
+              Upload your image, run AI analysis, and view the metadata and detection results in one place.
+            </p>
+          </div>
+          <a href="/" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+            Back to Home
+          </a>
+        </div>
+
+        <form id="uploadForm" class="mt-6 space-y-4">
+          <div
+            id="uploadContainer"
+            class="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition-all duration-300 hover:border-indigo-400 hover:bg-indigo-50"
+          >
+            <button id="uploadPrompt" type="button" class="w-full space-y-2">
+              <p class="text-base font-semibold text-slate-800">Drag and drop or click to upload</p>
+              <p class="text-sm text-slate-500">PNG, JPG, WEBP and more</p>
+            </button>
+
+            <div id="uploadedState" class="hidden space-y-4 transition-all duration-300">
+              <p id="uploadedMessage" class="text-base font-semibold text-emerald-700"></p>
+              <div class="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  id="changeImageBtn"
+                  type="button"
+                  class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                >
+                  Change Image
+                </button>
+                <button
+                  id="deleteImageBtn"
+                  type="button"
+                  class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                >
+                  Delete Image
+                </button>
+              </div>
+            </div>
+
+            <input id="imageInput" name="file" type="file" accept="image/*" class="sr-only" required />
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              id="uploadBtn"
+              type="submit"
+              class="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Upload & Analyze
+            </button>
+            <p id="statusText" class="text-sm text-slate-500">Choose an image to start.</p>
+          </div>
+        </form>
+      </section>
+
+      <section class="mt-8 grid gap-6 lg:grid-cols-2">
+        <article class="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 class="mb-4 text-lg font-semibold">Original Image</h2>
+          <div class="flex h-80 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+            <img id="originalPreview" alt="Original upload preview" class="hidden h-full w-full object-contain" />
+            <p id="originalPlaceholder" class="px-4 text-center text-sm text-slate-500">Uploaded image will appear here.</p>
+          </div>
+          <div id="imageMeta" class="mt-4 hidden rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"></div>
+        </article>
+
+        <article class="rounded-2xl bg-white p-5 shadow-sm">
+          <h2 class="mb-4 text-lg font-semibold">AI Analysis</h2>
+
+          <div id="aiLoading" class="hidden rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-indigo-800">
+            <div class="flex items-center gap-3">
+              <div class="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+              <p class="text-sm font-medium">Loading...</p>
+            </div>
+          </div>
+
+          <div id="aiResults" class="hidden space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4"></div>
+
+          <div id="aiPlaceholder" class="flex h-80 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+            <p class="px-4 text-center text-sm text-slate-500">AI findings will appear here after upload.</p>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
