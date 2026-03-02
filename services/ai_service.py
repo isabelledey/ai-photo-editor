@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 
 import google.generativeai as genai
 
 from core.config import GEMINI_API_KEY
+
+logger = logging.getLogger(__name__)
 
 
 def parse_ai_json(raw_text: str) -> dict:
@@ -39,6 +42,7 @@ def parse_ai_json(raw_text: str) -> dict:
 def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
     """Run Gemini image analysis and return normalized JSON fields."""
     if not GEMINI_API_KEY:
+        logger.error("GEMINI_API_KEY is missing or empty. Check your .env loading and key value.")
         return {
             "person_detected": False,
             "face_detected": False,
@@ -52,7 +56,7 @@ def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
     )
 
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-flash")
     response = model.generate_content(
         [
             prompt,
