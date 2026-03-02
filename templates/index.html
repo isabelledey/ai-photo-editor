@@ -17,21 +17,42 @@
         </p>
         <h1 class="mt-2 text-3xl font-bold sm:text-4xl">AI Image Editor</h1>
         <p class="mt-3 max-w-2xl text-slate-600">
-          Upload an image to preview it as the original input. The edited output panel is ready for future AI processing.
+          Upload an image to preview it as the original input, then inspect dimensions, orientation, and Gemini AI analysis.
         </p>
 
         <form id="uploadForm" class="mt-6 space-y-4">
-          <!-- Styled file input (drag-and-drop style card). -->
-          <label
-            for="imageInput"
-            class="group block cursor-pointer rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition hover:border-indigo-400 hover:bg-indigo-50"
+          <!-- Upload zone with two visual states: initial and uploaded. -->
+          <div
+            id="uploadContainer"
+            class="rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-8 text-center transition-all duration-300 hover:border-indigo-400 hover:bg-indigo-50"
           >
-            <div class="space-y-2">
-              <p class="text-base font-semibold text-slate-800">Drop an image here or click to browse</p>
+            <button id="uploadPrompt" type="button" class="w-full space-y-2">
+              <p class="text-base font-semibold text-slate-800">Drag and drop or click to upload</p>
               <p class="text-sm text-slate-500">PNG, JPG, WEBP and more</p>
+            </button>
+
+            <div id="uploadedState" class="hidden space-y-4 transition-all duration-300">
+              <p id="uploadedMessage" class="text-base font-semibold text-emerald-700"></p>
+              <div class="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  id="changeImageBtn"
+                  type="button"
+                  class="rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100"
+                >
+                  שינוי תמונה
+                </button>
+                <button
+                  id="deleteImageBtn"
+                  type="button"
+                  class="rounded-lg border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+                >
+                  מחק תמונה
+                </button>
+              </div>
             </div>
+
             <input id="imageInput" name="file" type="file" accept="image/*" class="sr-only" required />
-          </label>
+          </div>
 
           <div class="flex flex-wrap items-center gap-3">
             <button
@@ -39,7 +60,7 @@
               type="submit"
               class="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Upload Image
+              Upload & Analyze
             </button>
             <p id="statusText" class="text-sm text-slate-500">Choose an image to start.</p>
           </div>
@@ -57,13 +78,29 @@
               Uploaded image will appear here.
             </p>
           </div>
+
+          <!-- Populated with filename, dimensions and orientation after upload. -->
+          <div id="imageMeta" class="mt-4 hidden rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"></div>
         </article>
 
         <article class="rounded-2xl bg-white p-5 shadow-sm">
-          <h2 class="mb-4 text-lg font-semibold">Edited Image</h2>
-          <div class="flex h-80 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
+          <h2 class="mb-4 text-lg font-semibold">AI Analysis</h2>
+
+          <!-- Shown while backend is processing the upload + AI inference. -->
+          <div id="aiLoading" class="hidden rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-indigo-800">
+            <div class="flex items-center gap-3">
+              <div class="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
+              <p class="text-sm font-medium">Analyzing AI...</p>
+            </div>
+          </div>
+
+          <!-- Dynamic AI results container. -->
+          <div id="aiResults" class="hidden space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4"></div>
+
+          <!-- Default placeholder before first upload. -->
+          <div id="aiPlaceholder" class="flex h-80 items-center justify-center rounded-xl border border-slate-200 bg-slate-50">
             <p class="px-4 text-center text-sm text-slate-500">
-              AI-edited result will appear here in a later step.
+              AI findings will appear here after upload.
             </p>
           </div>
         </article>
@@ -76,8 +113,103 @@
       const imageInput = document.getElementById("imageInput");
       const uploadBtn = document.getElementById("uploadBtn");
       const statusText = document.getElementById("statusText");
+      const uploadContainer = document.getElementById("uploadContainer");
+      const uploadPrompt = document.getElementById("uploadPrompt");
+      const uploadedState = document.getElementById("uploadedState");
+      const uploadedMessage = document.getElementById("uploadedMessage");
+      const changeImageBtn = document.getElementById("changeImageBtn");
+      const deleteImageBtn = document.getElementById("deleteImageBtn");
+
       const originalPreview = document.getElementById("originalPreview");
       const originalPlaceholder = document.getElementById("originalPlaceholder");
+      const imageMeta = document.getElementById("imageMeta");
+
+      const aiLoading = document.getElementById("aiLoading");
+      const aiResults = document.getElementById("aiResults");
+      const aiPlaceholder = document.getElementById("aiPlaceholder");
+
+      let localPreviewUrl = null;
+
+      const yesNoBadge = (value) => {
+        const truthy = Boolean(value);
+        const color = truthy
+          ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+          : "bg-rose-100 text-rose-700 border-rose-200";
+        const label = truthy ? "Yes" : "No";
+        return `<span class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${color}">${label}</span>`;
+      };
+
+      const clearLocalPreviewUrl = () => {
+        if (localPreviewUrl) {
+          URL.revokeObjectURL(localPreviewUrl);
+          localPreviewUrl = null;
+        }
+      };
+
+      const setInitialUploadState = () => {
+        uploadPrompt.classList.remove("hidden");
+        uploadedState.classList.add("hidden");
+        uploadContainer.classList.remove("border-emerald-300", "bg-emerald-50");
+      };
+
+      const setUploadedState = (file) => {
+        uploadPrompt.classList.add("hidden");
+        uploadedMessage.textContent = `התמונה הועלתה: ${file.name}`;
+        uploadedState.classList.remove("hidden");
+        uploadContainer.classList.add("border-emerald-300", "bg-emerald-50");
+      };
+
+      const clearPreviewAndResults = () => {
+        clearLocalPreviewUrl();
+        originalPreview.removeAttribute("src");
+        originalPreview.classList.add("hidden");
+        originalPlaceholder.classList.remove("hidden");
+
+        imageMeta.classList.add("hidden");
+        imageMeta.innerHTML = "";
+
+        aiLoading.classList.add("hidden");
+        aiResults.classList.add("hidden");
+        aiResults.innerHTML = "";
+        aiPlaceholder.classList.remove("hidden");
+      };
+
+      const handleFileSelected = (file) => {
+        if (!file) {
+          return;
+        }
+
+        setUploadedState(file);
+
+        // Immediate local preview before server upload completes.
+        clearLocalPreviewUrl();
+        localPreviewUrl = URL.createObjectURL(file);
+        originalPreview.src = localPreviewUrl;
+        originalPreview.classList.remove("hidden");
+        originalPlaceholder.classList.add("hidden");
+      };
+
+      // Initial prompt and change button both open file picker.
+      uploadPrompt.addEventListener("click", () => imageInput.click());
+      changeImageBtn.addEventListener("click", () => imageInput.click());
+
+      // Update uploaded state as soon as a file is selected.
+      imageInput.addEventListener("change", () => {
+        if (!imageInput.files || !imageInput.files[0]) {
+          return;
+        }
+
+        handleFileSelected(imageInput.files[0]);
+        statusText.textContent = "Image selected. Click 'Upload & Analyze' to continue.";
+      });
+
+      // Delete action clears input, preview, analysis, and restores initial state.
+      deleteImageBtn.addEventListener("click", () => {
+        imageInput.value = "";
+        setInitialUploadState();
+        clearPreviewAndResults();
+        statusText.textContent = "Choose an image to start.";
+      });
 
       // Submit upload asynchronously to the FastAPI endpoint.
       form.addEventListener("submit", async (event) => {
@@ -91,10 +223,14 @@
         const formData = new FormData();
         formData.append("file", imageInput.files[0]);
 
-        // Loading state: prevent duplicate uploads and inform the user.
+        // Loading state while server handles upload + Pillow + Gemini analysis.
         uploadBtn.disabled = true;
         uploadBtn.textContent = "Uploading...";
-        statusText.textContent = "Uploading image, please wait...";
+        statusText.textContent = "Uploading image and running analysis...";
+
+        aiPlaceholder.classList.add("hidden");
+        aiResults.classList.add("hidden");
+        aiLoading.classList.remove("hidden");
 
         try {
           const response = await fetch("/api/upload", {
@@ -108,19 +244,55 @@
             throw new Error(data.detail || "Upload failed.");
           }
 
-          // Show uploaded image in Original Image panel.
+          // Replace local preview with server-served file URL.
+          clearLocalPreviewUrl();
           originalPreview.src = data.file_url;
           originalPreview.classList.remove("hidden");
           originalPlaceholder.classList.add("hidden");
 
-          statusText.textContent = "Upload successful.";
+          // Render image metadata from backend.
+          imageMeta.innerHTML = `
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <div><p class="text-xs uppercase tracking-wide text-slate-500">Filename</p><p class="font-semibold text-slate-800">${data.filename}</p></div>
+              <div><p class="text-xs uppercase tracking-wide text-slate-500">Dimensions</p><p class="font-semibold text-slate-800">${data.width} x ${data.height}px</p></div>
+              <div><p class="text-xs uppercase tracking-wide text-slate-500">Orientation</p><p class="font-semibold text-slate-800">${data.orientation}</p></div>
+            </div>
+          `;
+          imageMeta.classList.remove("hidden");
+
+          const ai = data.ai_analysis || {};
+
+          // Render structured AI findings in the right panel.
+          aiResults.innerHTML = `
+            <div class="rounded-lg border border-emerald-200 bg-white p-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Person detected</p>
+              <div class="mt-1">${yesNoBadge(ai.person_detected)}</div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Visible face detected</p>
+              <div class="mt-1">${yesNoBadge(ai.face_detected)}</div>
+            </div>
+            <div class="rounded-lg border border-emerald-200 bg-white p-3">
+              <p class="text-xs uppercase tracking-wide text-slate-500">Perceived gender</p>
+              <p class="mt-1 text-sm font-semibold text-slate-800">${ai.perceived_gender || "Unknown/Not clear"}</p>
+            </div>
+          `;
+
+          aiResults.classList.remove("hidden");
+          statusText.textContent = "Upload and analysis complete.";
         } catch (error) {
+          aiResults.classList.add("hidden");
+          aiPlaceholder.classList.remove("hidden");
           statusText.textContent = error.message || "Something went wrong during upload.";
         } finally {
+          aiLoading.classList.add("hidden");
           uploadBtn.disabled = false;
-          uploadBtn.textContent = "Upload Image";
+          uploadBtn.textContent = "Upload & Analyze";
         }
       });
+
+      // Ensure default state is consistent on first render.
+      setInitialUploadState();
     </script>
   </body>
 </html>
