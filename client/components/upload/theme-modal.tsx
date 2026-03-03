@@ -1,6 +1,6 @@
 "use client"
 
-import { Crown, Sparkles, X } from "lucide-react"
+import { Crown, Lock, Sparkles, X } from "lucide-react"
 
 type ThemeKey = "basic" | "festival" | "fantasy" | "corporate"
 
@@ -15,25 +15,25 @@ const THEME_OPTIONS: ThemeOption[] = [
   {
     key: "basic",
     title: "Basic",
-    subtitle: "Free - standard CodeFormer restoration",
+    subtitle: "Natural retouching and skin cleanup.",
     premium: false,
   },
   {
     key: "festival",
     title: "Festival",
-    subtitle: "Premium - colorful festival glitter, vibrant lighting",
+    subtitle: "Vibrant festival makeup, glitter, and neon vibes.",
     premium: true,
   },
   {
     key: "fantasy",
     title: "Fantasy",
-    subtitle: "Premium - ethereal glow, cinematic fantasy lighting",
+    subtitle: "Ethereal goddess makeup, glowing skin, and mystical lighting.",
     premium: true,
   },
   {
     key: "corporate",
     title: "Corporate",
-    subtitle: "Premium - professional studio headshot, sharp focus",
+    subtitle: "Professional studio makeup and executive headshot style.",
     premium: true,
   },
 ]
@@ -41,11 +41,12 @@ const THEME_OPTIONS: ThemeOption[] = [
 interface ThemeModalProps {
   open: boolean
   loading: boolean
+  isAdmin: boolean
   onClose: () => void
   onSelect: (theme: ThemeKey) => void
 }
 
-export function ThemeModal({ open, loading, onClose, onSelect }: ThemeModalProps) {
+export function ThemeModal({ open, loading, isAdmin, onClose, onSelect }: ThemeModalProps) {
   if (!open) {
     return null
   }
@@ -82,7 +83,12 @@ export function ThemeModal({ open, loading, onClose, onSelect }: ThemeModalProps
             >
               <div className="flex items-center gap-2">
                 <span className="text-base font-semibold text-white">{option.title}</span>
-                {option.premium ? (
+                {option.premium && !isAdmin ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(212,70,126,0.2)] px-2 py-0.5 text-[11px] font-semibold text-[#f7b5d0]">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </span>
+                ) : option.premium ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(212,70,126,0.2)] px-2 py-0.5 text-[11px] font-semibold text-[#f7b5d0]">
                     <Crown className="h-3 w-3" />
                     Premium

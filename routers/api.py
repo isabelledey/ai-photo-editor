@@ -4,11 +4,16 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.config import UPLOADS_DIR
 from services.ai_service import analyze_image_with_gemini, enhance_face
-from services.replicate_service import enhance_with_codeformer, normalize_theme
+from services.replicate_service import (
+    enhance_with_codeformer,
+    normalize_theme,
+    resolve_uploads_image_path,
+    transform_with_flux,
+)
 from services.image_service import determine_orientation, save_upload_and_get_metadata
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -17,6 +22,63 @@ logger = logging.getLogger(__name__)
 
 class EnhanceFaceRequest(BaseModel):
     image_filename: str
+
+
+class TransformRequest(BaseModel):
+    image_url: str
+    theme: str = "basic"
+    prompt_strength: float = Field(default=0.45, ge=0.0, le=1.0)
+
+
+@router.post("/transform")
+async def transform_image(payload: TransformRequest):
+    """
+    Stylize an uploaded portrait using FLUX with theme prompt mapping.
+    Accepts image_url + theme (strict requirement).
+    """
+    normalized_theme = normalize_theme(payload.theme)
+    logger.info("TRANSFORM start: image_url=%s theme=%s", payload.image_url, normalized_theme)
+    print(
+        f"[API] /api/transform start image_url={payload.image_url} theme={normalized_theme} prompt_strength={payload.prompt_strength}"
+    )
+
+    try:
+        source_path = resolve_uploads_image_path(payload.image_url, UPLOADS_DIR)
+        transformed = transform_with_flux(
+            image_path=source_path,
+            theme=normalized_theme,
+            uploads_dir=UPLOADS_DIR,
+            prompt_strength=payload.prompt_strength,
+            model_ref="black-forest-labs/flux-1.1-pro",
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("TRANSFORM failed: %s", exc)
+        print(f"[API] /api/transform error={exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    logger.info(
+        "TRANSFORM success: source=%s output=%s model=%s theme=%s",
+        source_path.name,
+        transformed["enhanced_filename"],
+        transformed["model"],
+        transformed["theme"],
+    )
+    print(
+        f"[API] /api/transform success source={source_path.name} output={transformed['enhanced_filename']} model={transformed['model']} theme={transformed['theme']}"
+    )
+
+    return {
+        "success": True,
+        "source_filename": source_path.name,
+        "theme": transformed["theme"],
+        "prompt": transformed["prompt"],
+        "model": transformed["model"],
+        "prompt_strength": transformed["prompt_strength"],
+        "enhanced_image_url": f"/uploads/{transformed['enhanced_filename']}",
+        "replicate_output_url": transformed["output_url"],
+    }
 
 
 @router.post("/enhance")

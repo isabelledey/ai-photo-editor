@@ -1,10 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { UploadHeader } from "@/components/upload/upload-header"
 import { FaceWorkflow } from "@/components/upload/face-workflow"
 import { Sparkles } from "lucide-react"
 
 export default function UploadPage() {
+  const [isAdmin, setIsAdmin] = useState(false)
+
   return (
     <div className="relative min-h-screen bg-[#170C59]">
       {/* Ambient glow effects */}
@@ -19,7 +22,7 @@ export default function UploadPage() {
         <div className="h-[800px] w-[800px] rounded-full border border-[rgba(91,63,191,0.08)]" />
       </div>
 
-      <UploadHeader />
+      <UploadHeader isAdmin={isAdmin} onToggleAdmin={setIsAdmin} />
 
       <main className="relative z-10 mx-auto max-w-xl px-6 pt-8 pb-24">
         {/* Page title */}
@@ -40,7 +43,7 @@ export default function UploadPage() {
         </div>
 
         {/* Glass card container */}
-        <FaceWorkflow />
+        <FaceWorkflow isAdmin={isAdmin} />
 
         {/* Subtle tip */}
         <p className="mt-6 text-center text-xs text-[#A994E0]/50">
