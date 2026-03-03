@@ -46,20 +46,21 @@ def _coerce_confidence(value) -> float:
     return max(0.0, min(1.0, confidence))
 
 
-def parse_ai_json(raw_text: str) -> dict:
-    """Parse model output into strict JSON structure."""
+def _extract_first_json_object(raw_text: str) -> dict:
     cleaned = (raw_text or "").strip()
-
     fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, flags=re.DOTALL)
     if fenced_match:
         cleaned = fenced_match.group(1)
-
     if not cleaned.startswith("{"):
         object_match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
         if object_match:
             cleaned = object_match.group(0)
+    return json.loads(cleaned)
 
-    parsed = json.loads(cleaned)
+
+def parse_ai_json(raw_text: str) -> dict:
+    """Parse model output into strict JSON structure."""
+    parsed = _extract_first_json_object(raw_text)
 
     person_detected = _coerce_bool(parsed.get("person_detected", False))
     face_detected = _coerce_bool(parsed.get("face_detected", False))
@@ -70,7 +71,7 @@ def parse_ai_json(raw_text: str) -> dict:
     if not person_detected or not face_detected:
         gender = "Unknown/Not clear"
     # Conservative threshold to reduce false Male/Female labels.
-    elif gender_confidence < 0.9:
+    elif gender_confidence < 0.65:
         gender = "Unknown/Not clear"
 
     return {
@@ -79,6 +80,43 @@ def parse_ai_json(raw_text: str) -> dict:
         "perceived_gender": gender,
         "gender_confidence": gender_confidence,
     }
+
+
+def _verify_gender_consistency(model, image_bytes: bytes, mime_type: str, proposed_gender: str) -> bool:
+    """
+    Second-pass verification to reduce false Male/Female classifications.
+    Returns True only when the model explicitly agrees with high confidence.
+    """
+    verify_prompt = (
+        "You are validating a previous gender classification result.\n"
+        f"Proposed gender: '{proposed_gender}'.\n"
+        "Look at the image and answer ONLY JSON with these keys:\n"
+        "agree_with_proposed_gender (boolean), confidence (number 0..1).\n"
+        "If uncertain, set agree_with_proposed_gender=false and confidence=0."
+    )
+    response = model.generate_content(
+        [
+            verify_prompt,
+            {
+                "mime_type": mime_type,
+                "data": image_bytes,
+            },
+        ],
+        generation_config={
+            "temperature": 0,
+            "response_mime_type": "application/json",
+        },
+    )
+    parsed = _extract_first_json_object(response.text or "")
+    agrees = _coerce_bool(parsed.get("agree_with_proposed_gender", False))
+    confidence = _coerce_confidence(parsed.get("confidence", 0))
+    logger.info(
+        "Gender verification: proposed=%s agrees=%s confidence=%.3f",
+        proposed_gender,
+        agrees,
+        confidence,
+    )
+    return agrees and confidence >= 0.7
 
 
 def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
@@ -151,11 +189,26 @@ def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
         logger.exception("Failed to parse Gemini response text: %r", raw_text)
         raise
 
+    if parsed["perceived_gender"] in {"Male", "Female"}:
+        try:
+            verified = _verify_gender_consistency(
+                model=model,
+                image_bytes=image_bytes,
+                mime_type=mime_type,
+                proposed_gender=parsed["perceived_gender"],
+            )
+            # Keep strong first-pass predictions even if verification is inconclusive.
+            if not verified and parsed.get("gender_confidence", 0.0) < 0.9:
+                parsed["perceived_gender"] = "Unknown/Not clear"
+        except Exception:
+            logger.exception("Gender verification pass failed; keeping first-pass result.")
+
     logger.info(
-        "AI analysis parsed: person=%s face=%s gender=%s",
+        "AI analysis parsed: person=%s face=%s gender=%s confidence=%.3f",
         parsed["person_detected"],
         parsed["face_detected"],
         parsed["perceived_gender"],
+        parsed.get("gender_confidence", 0.0),
     )
     return parsed
 

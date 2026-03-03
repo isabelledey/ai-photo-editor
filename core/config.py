@@ -14,6 +14,7 @@ load_dotenv(dotenv_path=BASE_DIR / ".env")
 
 # Environment configuration.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+REPLICATE_API_TOKEN = os.getenv("REPLICATE_API_TOKEN", "").strip()
 
 # Ensure runtime directories exist.
 STATIC_DIR.mkdir(parents=True, exist_ok=True)

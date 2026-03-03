@@ -1,147 +1,10 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
 import { UploadHeader } from "@/components/upload/upload-header"
-import { ImageUploader } from "@/components/upload/image-uploader"
-import { EnhanceButton } from "@/components/upload/enhance-button"
+import { FaceWorkflow } from "@/components/upload/face-workflow"
 import { Sparkles } from "lucide-react"
 
-type ResultState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "error"; message: string }
-  | { status: "success"; gender: string }
-
 export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [result, setResult] = useState<ResultState>({ status: "idle" })
-  const analysisRunRef = useRef(0)
-  const logEvent = (event: string, details?: Record<string, unknown>) => {
-    console.log(`[UploadPage] ${event}`, {
-      timestamp: new Date().toISOString(),
-      ...details,
-    })
-  }
-
-  const handleFileSelect = useCallback((f: File, url: string) => {
-    // Invalidate any in-flight analysis from a previous file.
-    analysisRunRef.current += 1
-    logEvent("file selected", {
-      runToken: analysisRunRef.current,
-      name: f.name,
-      type: f.type,
-      size: f.size,
-    })
-    setFile(f)
-    setPreview(url)
-    setResult({ status: "idle" })
-  }, [])
-
-  const handleRemove = useCallback(() => {
-    // Invalidate any in-flight analysis when file is removed.
-    analysisRunRef.current += 1
-    logEvent("file removed", {
-      runToken: analysisRunRef.current,
-      previousFile: file?.name ?? null,
-    })
-    if (preview) URL.revokeObjectURL(preview)
-    setFile(null)
-    setPreview(null)
-    setResult({ status: "idle" })
-  }, [file?.name, preview])
-
-  const handleEnhance = useCallback(async () => {
-    if (!file) {
-      logEvent("enhance clicked without file")
-      return
-    }
-
-    const runId = ++analysisRunRef.current
-    logEvent("enhance started", {
-      runId,
-      file: file.name,
-      size: file.size,
-    })
-    setResult({ status: "loading" })
-
-    try {
-      const formData = new FormData()
-      formData.append("file", file)
-
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      })
-
-      const payload = await response.json().catch(() => ({}))
-      logEvent("upload response received", {
-        runId,
-        status: response.status,
-        ok: response.ok,
-        payload,
-      })
-      if (!response.ok) {
-        const detail = payload?.detail || "Upload/analysis failed."
-        throw new Error(detail)
-      }
-
-      // Guard against stale async results when user picked/removed another file meanwhile.
-      if (runId !== analysisRunRef.current) {
-        logEvent("stale enhance result discarded", {
-          runId,
-          latestRunToken: analysisRunRef.current,
-        })
-        return
-      }
-
-      const analysis = payload?.ai_analysis ?? {}
-      const personDetected = Boolean(analysis.person_detected)
-      const gender = String(analysis.perceived_gender || "Unknown/Not clear")
-
-      if (!personDetected) {
-        logEvent("analysis result: no person detected", {
-          runId,
-          analysis,
-        })
-        setResult({
-          status: "error",
-          message:
-            "No person could be detected in this image. Please upload a clear photo that includes a person's face.",
-        })
-        return
-      }
-
-      logEvent("analysis success", {
-        runId,
-        analysis,
-      })
-      setResult({ status: "success", gender })
-    } catch (error) {
-      if (runId !== analysisRunRef.current) {
-        logEvent("stale error discarded", {
-          runId,
-          latestRunToken: analysisRunRef.current,
-        })
-        return
-      }
-      logEvent("analysis error", {
-        runId,
-        error: error instanceof Error ? error.message : String(error),
-      })
-      setResult({
-        status: "error",
-        message:
-          error instanceof Error ? error.message : "Upload/analysis failed.",
-      })
-    }
-  }, [file])
-
-  const handleDismissResult = useCallback(() => {
-    logEvent("dismiss result")
-    setResult({ status: "idle" })
-  }, [])
-
   return (
     <div className="relative min-h-screen bg-[#170C59]">
       {/* Ambient glow effects */}
@@ -177,22 +40,7 @@ export default function UploadPage() {
         </div>
 
         {/* Glass card container */}
-        <div className="rounded-3xl border border-[rgba(91,63,191,0.2)] bg-[rgba(91,63,191,0.06)] p-6 backdrop-blur-xl sm:p-8">
-          <div className="flex flex-col gap-6">
-            <ImageUploader
-              file={file}
-              preview={preview}
-              onFileSelect={handleFileSelect}
-              onRemove={handleRemove}
-            />
-            <EnhanceButton
-              hasFile={!!file}
-              result={result}
-              onEnhance={handleEnhance}
-              onDismissResult={handleDismissResult}
-            />
-          </div>
-        </div>
+        <FaceWorkflow />
 
         {/* Subtle tip */}
         <p className="mt-6 text-center text-xs text-[#A994E0]/50">

@@ -3,11 +3,12 @@ import mimetypes
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
 
 from core.config import UPLOADS_DIR
 from services.ai_service import analyze_image_with_gemini, enhance_face
+from services.replicate_service import enhance_with_codeformer, normalize_theme
 from services.image_service import determine_orientation, save_upload_and_get_metadata
 
 router = APIRouter(prefix="/api", tags=["api"])
@@ -16,6 +17,57 @@ logger = logging.getLogger(__name__)
 
 class EnhanceFaceRequest(BaseModel):
     image_filename: str
+
+
+@router.post("/enhance")
+async def enhance_image(file: UploadFile = File(...), theme: str = Form("basic")):
+    """
+    Enhance uploaded face image with Replicate CodeFormer after client-side face detection.
+    """
+    normalized_theme = normalize_theme(theme)
+    logger.info(
+        "ENHANCE(v2) start: filename=%s content_type=%s theme=%s",
+        file.filename,
+        file.content_type,
+        normalized_theme,
+    )
+    print(
+        f"[API] /api/enhance start filename={file.filename} content_type={file.content_type} theme={normalized_theme}"
+    )
+
+    saved_path, width, height = await save_upload_and_get_metadata(file=file, uploads_dir=UPLOADS_DIR)
+
+    try:
+        enhanced = enhance_with_codeformer(
+            image_path=saved_path,
+            theme=normalized_theme,
+            uploads_dir=UPLOADS_DIR,
+        )
+    except Exception as exc:
+        logger.exception("ENHANCE(v2) failed: %s", exc)
+        print(f"[API] /api/enhance error={exc}")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    logger.info(
+        "ENHANCE(v2) success: source=%s enhanced=%s theme=%s",
+        saved_path.name,
+        enhanced["enhanced_filename"],
+        enhanced["theme"],
+    )
+    print(
+        f"[API] /api/enhance success source={saved_path.name} enhanced={enhanced['enhanced_filename']} theme={enhanced['theme']}"
+    )
+
+    return {
+        "success": True,
+        "source_filename": saved_path.name,
+        "width": width,
+        "height": height,
+        "theme": enhanced["theme"],
+        "theme_prompt": enhanced["theme_prompt"],
+        "enhanced_image_url": f"/uploads/{enhanced['enhanced_filename']}",
+        "replicate_output_url": enhanced["output_url"],
+    }
 
 
 @router.post("/upload")
