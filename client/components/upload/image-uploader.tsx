@@ -1,7 +1,6 @@
 "use client"
 
 import { useCallback, useState, useRef } from "react"
-import Image from "next/image"
 import { Upload, ImagePlus, RefreshCw, Trash2 } from "lucide-react"
 
 interface ImageUploaderProps {
@@ -127,12 +126,10 @@ export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUp
       <div className="relative w-full overflow-hidden rounded-2xl border border-[rgba(91,63,191,0.25)] bg-[rgba(91,63,191,0.06)] backdrop-blur-xl">
         <div className="relative mx-auto flex aspect-[4/5] max-h-[480px] items-center justify-center p-4">
           <div className="relative h-full w-full overflow-hidden rounded-xl">
-            <Image
+            <img
               src={preview}
               alt="Preview of uploaded image"
-              fill
-              className="object-contain"
-              sizes="(max-width: 768px) 90vw, 500px"
+              className="h-full w-full object-contain"
             />
           </div>
         </div>

@@ -1,5 +1,5 @@
-import Link from "next/link"
-import { Check } from "lucide-react"
+import { Link } from "react-router-dom";
+import { Check } from "lucide-react";
 
 const plans = [
   {
@@ -48,7 +48,7 @@ const plans = [
     cta: "Contact Sales",
     popular: false,
   },
-]
+];
 
 export function PricingSection() {
   return (
@@ -92,19 +92,26 @@ export function PricingSection() {
               )}
 
               <div className="mb-6">
-                <h3 className="mb-2 text-lg font-semibold text-[#A994E0]">{plan.name}</h3>
+                <h3 className="mb-2 text-lg font-semibold text-[#A994E0]">
+                  {plan.name}
+                </h3>
                 <div className="flex items-baseline gap-1">
                   <span className="font-[family-name:var(--font-playfair)] text-5xl font-bold text-white">
                     {plan.price}
                   </span>
                   <span className="text-sm text-[#A994E0]">/{plan.period}</span>
                 </div>
-                <p className="mt-3 text-sm leading-relaxed text-[#A994E0]">{plan.description}</p>
+                <p className="mt-3 text-sm leading-relaxed text-[#A994E0]">
+                  {plan.description}
+                </p>
               </div>
 
               <ul className="mb-8 flex flex-col gap-3">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="flex items-center gap-3 text-sm text-[#F0EBF9]">
+                  <li
+                    key={feature}
+                    className="flex items-center gap-3 text-sm text-[#F0EBF9]"
+                  >
                     <Check className="h-4 w-4 shrink-0 text-[#D4467E]" />
                     {feature}
                   </li>
@@ -112,7 +119,7 @@ export function PricingSection() {
               </ul>
 
               {plan.cta === "Contact Sales" ? (
-                <Link
+                <a
                   href="mailto:sales@aistylist.com"
                   className={`block w-full rounded-xl py-3.5 text-center text-sm font-semibold transition-all ${
                     plan.popular
@@ -121,10 +128,10 @@ export function PricingSection() {
                   }`}
                 >
                   {plan.cta}
-                </Link>
+                </a>
               ) : (
                 <Link
-                  href="/upload"
+                  to="/upload"
                   className={`block w-full rounded-xl py-3.5 text-center text-sm font-semibold transition-all ${
                     plan.popular
                       ? "bg-[#D4467E] text-white hover:bg-[#E05A92] hover:shadow-lg hover:shadow-[#D4467E]/25"
@@ -139,5 +146,5 @@ export function PricingSection() {
         </div>
       </div>
     </section>
-  )
+  );
 }

@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { Link } from "react-router-dom"
 import { useState } from "react"
 import { Menu, X, Sparkles } from "lucide-react"
 
@@ -49,7 +49,7 @@ export function Navbar() {
               Sign In
             </a>
             <Link
-              href="/upload"
+              to="/upload"
               className="rounded-xl bg-[#D4467E] px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-[#E05A92] hover:shadow-lg hover:shadow-[#D4467E]/25"
             >
               Get Started
@@ -83,7 +83,7 @@ export function Navbar() {
               <hr className="border-[rgba(91,63,191,0.2)]" />
               <a href="#" className="text-base font-medium text-[#A994E0]">Sign In</a>
               <Link
-                href="/upload"
+                to="/upload"
                 className="rounded-xl bg-[#D4467E] px-5 py-3 text-center text-base font-semibold text-white"
               >
                 Get Started

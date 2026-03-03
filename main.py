@@ -43,7 +43,7 @@ async def frontend_fallback(full_path: str):
     """
     SPA fallback for client-side routes, while preserving /api, /static, and /uploads.
     """
-    blocked_roots = ("api", "static", "uploads")
+    blocked_roots = ("api", "static", "uploads", "images")
     if full_path.startswith(blocked_roots):
         raise HTTPException(status_code=404, detail="Not found")
 

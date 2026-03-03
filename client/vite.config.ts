@@ -3,16 +3,21 @@ import path from "node:path"
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname),
+export default defineConfig(({ command }) => {
+  const isBuild = command === "build"
+
+  return {
+    plugins: [react()],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname),
+      },
     },
-  },
-  base: "/static/",
-  build: {
-    outDir: "dist",
-    emptyOutDir: true,
-  },
+    // Use root in dev, but /static/ for FastAPI-served production builds.
+    base: isBuild ? "/static/" : "/",
+    build: {
+      outDir: "dist",
+      emptyOutDir: true,
+    },
+  }
 })

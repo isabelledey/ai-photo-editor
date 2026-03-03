@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 
 export function HeroSection() {
@@ -51,13 +52,13 @@ export function HeroSection() {
 
             {/* CTAs */}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <a
-                href="#"
+              <Link
+                to="/upload"
                 className="group flex items-center justify-center gap-2 rounded-2xl bg-[#D4467E] px-8 py-4 text-base font-semibold text-white transition-all hover:bg-[#E05A92] hover:shadow-xl hover:shadow-[#D4467E]/30"
               >
                 Start Now
                 <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
-              </a>
+              </Link>
               <a
                 href="#"
                 className="flex items-center justify-center gap-2 rounded-2xl border border-[rgba(91,63,191,0.3)] bg-[rgba(91,63,191,0.1)] px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-all hover:border-[rgba(91,63,191,0.5)] hover:bg-[rgba(91,63,191,0.2)]"
