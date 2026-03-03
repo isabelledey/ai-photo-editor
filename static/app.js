@@ -1,7 +1,8 @@
-// Grab DOM elements once for reuse.
+// Core form controls.
 const form = document.getElementById("uploadForm");
 const imageInput = document.getElementById("imageInput");
 const uploadBtn = document.getElementById("uploadBtn");
+const enhanceFaceBtn = document.getElementById("enhanceFaceBtn");
 const statusText = document.getElementById("statusText");
 const uploadContainer = document.getElementById("uploadContainer");
 const uploadPrompt = document.getElementById("uploadPrompt");
@@ -10,15 +11,23 @@ const uploadedMessage = document.getElementById("uploadedMessage");
 const changeImageBtn = document.getElementById("changeImageBtn");
 const deleteImageBtn = document.getElementById("deleteImageBtn");
 
+// Original image + metadata elements.
 const originalPreview = document.getElementById("originalPreview");
 const originalPlaceholder = document.getElementById("originalPlaceholder");
 const imageMeta = document.getElementById("imageMeta");
 
+// Analysis elements.
 const aiLoading = document.getElementById("aiLoading");
 const aiResults = document.getElementById("aiResults");
 const aiPlaceholder = document.getElementById("aiPlaceholder");
 
+// Enhancement elements.
+const enhancedLoading = document.getElementById("enhancedLoading");
+const enhancedPreview = document.getElementById("enhancedPreview");
+const enhancedPlaceholder = document.getElementById("enhancedPlaceholder");
+
 let localPreviewUrl = null;
+let currentFilename = null;
 
 const yesNoBadge = (value) => {
   const truthy = Boolean(value);
@@ -49,8 +58,17 @@ const setUploadedState = (file) => {
   uploadContainer.classList.add("border-emerald-300", "bg-emerald-50");
 };
 
+const resetEnhancedContainer = () => {
+  enhancedLoading.classList.add("hidden");
+  enhancedPreview.removeAttribute("src");
+  enhancedPreview.classList.add("hidden");
+  enhancedPlaceholder.classList.remove("hidden");
+};
+
 const clearPreviewAndResults = () => {
   clearLocalPreviewUrl();
+  currentFilename = null;
+
   originalPreview.removeAttribute("src");
   originalPreview.classList.add("hidden");
   originalPlaceholder.classList.remove("hidden");
@@ -62,16 +80,22 @@ const clearPreviewAndResults = () => {
   aiResults.classList.add("hidden");
   aiResults.innerHTML = "";
   aiPlaceholder.classList.remove("hidden");
+
+  resetEnhancedContainer();
+  enhanceFaceBtn.disabled = true;
 };
 
 const handleFileSelected = (file) => {
-  if (!file) {
-    return;
-  }
+  if (!file) return;
 
   setUploadedState(file);
 
-  // Immediate local preview before server upload completes.
+  // Reset server-derived state because the user selected a new source image.
+  currentFilename = null;
+  enhanceFaceBtn.disabled = true;
+  resetEnhancedContainer();
+
+  // Immediate local preview before upload finishes.
   clearLocalPreviewUrl();
   localPreviewUrl = URL.createObjectURL(file);
   originalPreview.src = localPreviewUrl;
@@ -79,21 +103,16 @@ const handleFileSelected = (file) => {
   originalPlaceholder.classList.add("hidden");
 };
 
-// Initial prompt and change button both open file picker.
 uploadPrompt.addEventListener("click", () => imageInput.click());
 changeImageBtn.addEventListener("click", () => imageInput.click());
 
-// Update uploaded state as soon as a file is selected.
 imageInput.addEventListener("change", () => {
-  if (!imageInput.files || !imageInput.files[0]) {
-    return;
-  }
+  if (!imageInput.files || !imageInput.files[0]) return;
 
   handleFileSelected(imageInput.files[0]);
   statusText.textContent = "Image selected. Click 'Upload & Analyze' to continue.";
 });
 
-// Delete action clears input, preview, analysis, and restores initial state.
 deleteImageBtn.addEventListener("click", () => {
   imageInput.value = "";
   setInitialUploadState();
@@ -101,7 +120,6 @@ deleteImageBtn.addEventListener("click", () => {
   statusText.textContent = "Choose an image to start.";
 });
 
-// Submit upload asynchronously to the FastAPI endpoint.
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -113,14 +131,17 @@ form.addEventListener("submit", async (event) => {
   const formData = new FormData();
   formData.append("file", imageInput.files[0]);
 
-  // Loading state while server handles upload + image processing + AI analysis.
   uploadBtn.disabled = true;
+  enhanceFaceBtn.disabled = true;
   uploadBtn.textContent = "Loading...";
   statusText.textContent = "Loading...";
 
   aiPlaceholder.classList.add("hidden");
   aiResults.classList.add("hidden");
   aiLoading.classList.remove("hidden");
+
+  // New upload invalidates previous enhanced output.
+  resetEnhancedContainer();
 
   try {
     const response = await fetch("/api/upload", {
@@ -134,13 +155,13 @@ form.addEventListener("submit", async (event) => {
       throw new Error(data.detail || "Upload failed.");
     }
 
-    // Replace local preview with server-served file URL.
+    currentFilename = data.filename;
+
     clearLocalPreviewUrl();
     originalPreview.src = data.file_url;
     originalPreview.classList.remove("hidden");
     originalPlaceholder.classList.add("hidden");
 
-    // Render image metadata from backend.
     imageMeta.innerHTML = `
       <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
         <div><p class="text-xs uppercase tracking-wide text-slate-500">Filename</p><p class="font-semibold text-slate-800">${data.filename}</p></div>
@@ -151,8 +172,6 @@ form.addEventListener("submit", async (event) => {
     imageMeta.classList.remove("hidden");
 
     const ai = data.ai_analysis || {};
-
-    // Render structured AI findings in the right panel.
     aiResults.innerHTML = `
       <div class="rounded-lg border border-emerald-200 bg-white p-3">
         <p class="text-xs uppercase tracking-wide text-slate-500">Person detected</p>
@@ -169,10 +188,12 @@ form.addEventListener("submit", async (event) => {
     `;
 
     aiResults.classList.remove("hidden");
-    statusText.textContent = "Upload and analysis complete.";
+    enhanceFaceBtn.disabled = !currentFilename;
+    statusText.textContent = "Upload and analysis complete. You can now enhance the face.";
   } catch (error) {
     aiResults.classList.add("hidden");
     aiPlaceholder.classList.remove("hidden");
+    enhanceFaceBtn.disabled = true;
     statusText.textContent = error.message || "Something went wrong during upload.";
   } finally {
     aiLoading.classList.add("hidden");
@@ -181,5 +202,43 @@ form.addEventListener("submit", async (event) => {
   }
 });
 
-// Ensure default state is consistent on first render.
+enhanceFaceBtn.addEventListener("click", async () => {
+  if (!currentFilename) {
+    statusText.textContent = "Please upload and analyze an image first.";
+    return;
+  }
+
+  enhanceFaceBtn.disabled = true;
+  enhancedLoading.classList.remove("hidden");
+  enhancedPreview.classList.add("hidden");
+  enhancedPlaceholder.classList.add("hidden");
+  statusText.textContent = "Enhancing face...";
+
+  try {
+    const response = await fetch("/api/enhance-face", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image_filename: currentFilename }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success || !data.enhanced_image_url) {
+      throw new Error(data.detail || "Face enhancement failed.");
+    }
+
+    enhancedPreview.src = data.enhanced_image_url;
+    enhancedPreview.classList.remove("hidden");
+    statusText.textContent = "Face enhancement complete.";
+  } catch (error) {
+    enhancedPreview.classList.add("hidden");
+    enhancedPlaceholder.classList.remove("hidden");
+    statusText.textContent = error.message || "Something went wrong during face enhancement.";
+  } finally {
+    enhancedLoading.classList.add("hidden");
+    enhanceFaceBtn.disabled = !currentFilename;
+  }
+});
+
 setInitialUploadState();
+clearPreviewAndResults();

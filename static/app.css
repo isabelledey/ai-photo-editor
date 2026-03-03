@@ -1,0 +1,161 @@
+:root {
+  --bg-main: #0f0616;
+  --bg-panel: #1a0d2a;
+  --bg-soft: rgba(188, 19, 254, 0.08);
+  --border-soft: rgba(255, 0, 255, 0.24);
+  --neon-purple: #bc13fe;
+  --neon-pink: #ff00ff;
+  --neon-green: #39ff14;
+  --text-main: #f3e8ff;
+  --text-muted: #d8b4fe;
+}
+
+.cyber-body {
+  background:
+    radial-gradient(circle at 50% 45%, rgba(188, 19, 254, 0.18), transparent 52%),
+    radial-gradient(circle at 35% 70%, rgba(255, 0, 255, 0.1), transparent 45%),
+    var(--bg-main);
+  color: var(--text-main);
+}
+
+.cyber-main {
+  position: relative;
+}
+
+.cyber-card {
+  background: linear-gradient(145deg, rgba(26, 13, 42, 0.96), rgba(20, 10, 34, 0.9));
+  border: 1px solid var(--border-soft);
+  box-shadow:
+    0 10px 35px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(188, 19, 254, 0.08);
+}
+
+.neon-title {
+  color: #fdf4ff;
+  text-shadow:
+    0 0 7px rgba(255, 0, 255, 0.7),
+    0 0 18px rgba(188, 19, 254, 0.55);
+  letter-spacing: 0.02em;
+}
+
+.cyber-upload {
+  background: rgba(28, 14, 45, 0.72);
+  border-color: rgba(188, 19, 254, 0.4);
+}
+
+.cyber-upload:hover {
+  border-color: rgba(255, 0, 255, 0.75);
+  background: rgba(36, 18, 60, 0.78);
+}
+
+.cyber-btn {
+  color: #fef7ff;
+  border: 1px solid rgba(188, 19, 254, 0.62);
+  background: rgba(188, 19, 254, 0.11);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 0 rgba(188, 19, 254, 0);
+  transition: all 180ms ease;
+}
+
+.cyber-btn.primary {
+  background: linear-gradient(135deg, rgba(188, 19, 254, 0.32), rgba(255, 0, 255, 0.25));
+}
+
+.cyber-btn.danger {
+  border-color: rgba(255, 0, 255, 0.52);
+  background: rgba(255, 0, 255, 0.13);
+}
+
+.cyber-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(255, 0, 255, 0.95);
+  box-shadow:
+    0 0 14px rgba(188, 19, 254, 0.6),
+    0 0 24px rgba(255, 0, 255, 0.25);
+}
+
+.preview-frame {
+  background: rgba(20, 10, 33, 0.82);
+  border-color: rgba(188, 19, 254, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(188, 19, 254, 0.2),
+    0 0 24px rgba(188, 19, 254, 0.28),
+    inset 0 0 30px rgba(0, 0, 0, 0.35);
+}
+
+#aiResults,
+#imageMeta,
+#aiLoading,
+#enhancedLoading {
+  background: rgba(22, 11, 36, 0.72);
+  border-color: rgba(188, 19, 254, 0.35);
+}
+
+/* Metadata layout fix: clean cards, no overlap, consistent spacing */
+#imageMeta > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+#imageMeta > div > div {
+  min-width: 0;
+  border: 1px solid rgba(188, 19, 254, 0.28);
+  border-radius: 0.55rem;
+  background: rgba(188, 19, 254, 0.08);
+  padding: 0.5rem 0.6rem;
+}
+
+#imageMeta > div > div p:first-child {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 0.2rem 0;
+}
+
+#imageMeta > div > div p:last-child {
+  color: var(--text-main);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* Filename: monospaced + truncation so dimensions/orientation remain readable */
+#imageMeta > div > div:first-child p:last-child {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Make success indicators neon green for detected states. */
+#aiResults .bg-emerald-100 {
+  background: rgba(57, 255, 20, 0.16) !important;
+}
+
+#aiResults .text-emerald-700 {
+  color: var(--neon-green) !important;
+}
+
+#aiResults .border-emerald-200 {
+  border-color: rgba(57, 255, 20, 0.62) !important;
+}
+
+/* Keep negative state aligned with neon-pink theme. */
+#aiResults .bg-rose-100 {
+  background: rgba(255, 0, 255, 0.16) !important;
+}
+
+#aiResults .text-rose-700 {
+  color: #ff7bff !important;
+}
+
+#aiResults .border-rose-200 {
+  border-color: rgba(255, 0, 255, 0.58) !important;
+}
+
+@media (max-width: 1024px) {
+  #imageMeta > div {
+    grid-template-columns: 1fr;
+  }
+}
