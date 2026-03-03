@@ -6,7 +6,7 @@ type ResultState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "success"; gender: "Female" | "Male" }
+  | { status: "success"; gender: string }
 
 interface EnhanceButtonProps {
   hasFile: boolean
@@ -17,14 +17,27 @@ interface EnhanceButtonProps {
 
 export function EnhanceButton({ hasFile, result, onEnhance, onDismissResult }: EnhanceButtonProps) {
   const isLoading = result.status === "loading"
+  const handleEnhanceClick = () => {
+    console.log("[Upload][EnhanceButton] enhance clicked", {
+      hasFile,
+      status: result.status,
+    })
+    onEnhance()
+  }
+  const handleDismissClick = () => {
+    console.log("[Upload][EnhanceButton] dismiss result clicked", {
+      status: result.status,
+    })
+    onDismissResult()
+  }
 
   return (
     <div className="flex w-full flex-col gap-4">
       {/* Main action button */}
-      <button
-        type="button"
-        onClick={onEnhance}
-        disabled={!hasFile || isLoading}
+        <button
+          type="button"
+          onClick={handleEnhanceClick}
+          disabled={!hasFile || isLoading}
         className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#D4467E] to-[#5B3FBF] px-8 py-4 text-base font-semibold text-white shadow-lg shadow-[#D4467E]/20 transition-all enabled:hover:shadow-xl enabled:hover:shadow-[#D4467E]/30 enabled:hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {/* Animated shimmer on hover */}
@@ -53,7 +66,7 @@ export function EnhanceButton({ hasFile, result, onEnhance, onDismissResult }: E
           </div>
           <button
             type="button"
-            onClick={onDismissResult}
+            onClick={handleDismissClick}
             className="shrink-0 rounded-lg p-1 text-red-400/60 transition-colors hover:bg-red-500/10 hover:text-red-300"
             aria-label="Dismiss error"
           >
@@ -74,7 +87,7 @@ export function EnhanceButton({ hasFile, result, onEnhance, onDismissResult }: E
           </div>
           <button
             type="button"
-            onClick={onDismissResult}
+            onClick={handleDismissClick}
             className="shrink-0 rounded-lg p-1 text-emerald-400/60 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300"
             aria-label="Dismiss result"
           >

@@ -21,7 +21,21 @@ class EnhanceFaceRequest(BaseModel):
 @router.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
     """Upload image, extract metadata, run AI analysis, and return structured response."""
+    logger.info(
+        "UPLOAD start: filename=%s content_type=%s",
+        file.filename,
+        file.content_type,
+    )
+    print(f"[API] /api/upload start filename={file.filename} content_type={file.content_type}")
+
     saved_path, width, height = await save_upload_and_get_metadata(file=file, uploads_dir=UPLOADS_DIR)
+    logger.info(
+        "UPLOAD saved: stored_filename=%s width=%s height=%s",
+        saved_path.name,
+        width,
+        height,
+    )
+    print(f"[API] /api/upload saved stored_filename={saved_path.name} width={width} height={height}")
 
     orientation = determine_orientation(width=width, height=height)
     image_bytes = saved_path.read_bytes()
@@ -31,9 +45,12 @@ async def upload_image(file: UploadFile = File(...)):
             image_bytes=image_bytes,
             mime_type=file.content_type or "image/jpeg"
         )
+        logger.info("UPLOAD ai_analysis: %s", ai_analysis)
+        print(f"[API] /api/upload ai_analysis={ai_analysis}")
 
     except Exception as e:
         logger.exception("AI analysis failed for '%s': %s", saved_path.name, e)
+        print(f"[API] /api/upload ai_analysis_error={e}")
         ai_analysis = {
             "person_detected": False,
             "face_detected": False,
@@ -56,6 +73,9 @@ async def enhance_face_endpoint(payload: EnhanceFaceRequest):
     """
     Enhance facial details while preserving identity and return a new image URL.
     """
+    logger.info("ENHANCE start: image_filename=%s", payload.image_filename)
+    print(f"[API] /api/enhance-face start image_filename={payload.image_filename}")
+
     source_path = (UPLOADS_DIR / Path(payload.image_filename).name).resolve()
     uploads_root = UPLOADS_DIR.resolve()
 
@@ -70,11 +90,14 @@ async def enhance_face_endpoint(payload: EnhanceFaceRequest):
         enhanced_bytes = await enhance_face(image_bytes=source_bytes, mime_type=mime_type)
     except Exception as e:
         logger.exception("Face enhancement failed for '%s': %s", source_path.name, e)
+        print(f"[API] /api/enhance-face error source={source_path.name} error={e}")
         raise HTTPException(status_code=500, detail=f"Face enhancement failed: {e}") from e
 
     suffix = source_path.suffix.lower() or ".jpg"
     enhanced_name = f"enhanced_{uuid4().hex}{suffix}"
     enhanced_path = UPLOADS_DIR / enhanced_name
     enhanced_path.write_bytes(enhanced_bytes)
+    logger.info("ENHANCE success: output=%s", enhanced_name)
+    print(f"[API] /api/enhance-face success output={enhanced_name}")
 
     return {"success": True, "enhanced_image_url": f"/uploads/{enhanced_name}"}

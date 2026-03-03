@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { UploadHeader } from "@/components/upload/upload-header"
 import { ImageUploader } from "@/components/upload/image-uploader"
 import { EnhanceButton } from "@/components/upload/enhance-button"
@@ -10,51 +10,135 @@ type ResultState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "success"; gender: "Female" | "Male" }
+  | { status: "success"; gender: string }
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [result, setResult] = useState<ResultState>({ status: "idle" })
+  const analysisRunRef = useRef(0)
+  const logEvent = (event: string, details?: Record<string, unknown>) => {
+    console.log(`[UploadPage] ${event}`, {
+      timestamp: new Date().toISOString(),
+      ...details,
+    })
+  }
 
   const handleFileSelect = useCallback((f: File, url: string) => {
+    // Invalidate any in-flight analysis from a previous file.
+    analysisRunRef.current += 1
+    logEvent("file selected", {
+      runToken: analysisRunRef.current,
+      name: f.name,
+      type: f.type,
+      size: f.size,
+    })
     setFile(f)
     setPreview(url)
     setResult({ status: "idle" })
   }, [])
 
   const handleRemove = useCallback(() => {
+    // Invalidate any in-flight analysis when file is removed.
+    analysisRunRef.current += 1
+    logEvent("file removed", {
+      runToken: analysisRunRef.current,
+      previousFile: file?.name ?? null,
+    })
     if (preview) URL.revokeObjectURL(preview)
     setFile(null)
     setPreview(null)
     setResult({ status: "idle" })
-  }, [preview])
+  }, [file?.name, preview])
 
   const handleEnhance = useCallback(async () => {
-    if (!file) return
+    if (!file) {
+      logEvent("enhance clicked without file")
+      return
+    }
+
+    const runId = ++analysisRunRef.current
+    logEvent("enhance started", {
+      runId,
+      file: file.name,
+      size: file.size,
+    })
     setResult({ status: "loading" })
 
-    // Simulate API call with a 2-second delay
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    try {
+      const formData = new FormData()
+      formData.append("file", file)
 
-    // Mock validation: randomly decide if a person is detected or not.
-    // Use file name as a seed — filenames containing "no" trigger an error for easy testing.
-    const triggerError = file.name.toLowerCase().includes("no")
-    const randomDetect = Math.random() > 0.3
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
 
-    if (triggerError || !randomDetect) {
+      const payload = await response.json().catch(() => ({}))
+      logEvent("upload response received", {
+        runId,
+        status: response.status,
+        ok: response.ok,
+        payload,
+      })
+      if (!response.ok) {
+        const detail = payload?.detail || "Upload/analysis failed."
+        throw new Error(detail)
+      }
+
+      // Guard against stale async results when user picked/removed another file meanwhile.
+      if (runId !== analysisRunRef.current) {
+        logEvent("stale enhance result discarded", {
+          runId,
+          latestRunToken: analysisRunRef.current,
+        })
+        return
+      }
+
+      const analysis = payload?.ai_analysis ?? {}
+      const personDetected = Boolean(analysis.person_detected)
+      const gender = String(analysis.perceived_gender || "Unknown/Not clear")
+
+      if (!personDetected) {
+        logEvent("analysis result: no person detected", {
+          runId,
+          analysis,
+        })
+        setResult({
+          status: "error",
+          message:
+            "No person could be detected in this image. Please upload a clear photo that includes a person's face.",
+        })
+        return
+      }
+
+      logEvent("analysis success", {
+        runId,
+        analysis,
+      })
+      setResult({ status: "success", gender })
+    } catch (error) {
+      if (runId !== analysisRunRef.current) {
+        logEvent("stale error discarded", {
+          runId,
+          latestRunToken: analysisRunRef.current,
+        })
+        return
+      }
+      logEvent("analysis error", {
+        runId,
+        error: error instanceof Error ? error.message : String(error),
+      })
       setResult({
         status: "error",
         message:
-          "No person could be detected in this image. Please upload a clear photo that includes a person's face.",
+          error instanceof Error ? error.message : "Upload/analysis failed.",
       })
-    } else {
-      const gender = Math.random() > 0.5 ? "Female" : "Male"
-      setResult({ status: "success", gender })
     }
   }, [file])
 
   const handleDismissResult = useCallback(() => {
+    logEvent("dismiss result")
     setResult({ status: "idle" })
   }, [])
 

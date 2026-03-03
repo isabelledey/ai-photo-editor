@@ -12,10 +12,16 @@ interface ImageUploaderProps {
 
 export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false)
+  const [inputNonce, setInputNonce] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleFile = useCallback(
     (f: File) => {
+      console.log("[Upload][ImageUploader] handleFile called", {
+        name: f.name,
+        type: f.type,
+        size: f.size,
+      })
       if (!f.type.startsWith("image/")) return
       const url = URL.createObjectURL(f)
       onFileSelect(f, url)
@@ -28,6 +34,10 @@ export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUp
       e.preventDefault()
       setIsDragging(false)
       const droppedFile = e.dataTransfer.files[0]
+      console.log("[Upload][ImageUploader] file dropped", {
+        hasFile: Boolean(droppedFile),
+        name: droppedFile?.name,
+      })
       if (droppedFile) handleFile(droppedFile)
     },
     [handleFile]
@@ -46,16 +56,42 @@ export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUp
   const handleInputChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const selected = e.target.files?.[0]
+      console.log("[Upload][ImageUploader] file input changed", {
+        hasFile: Boolean(selected),
+        name: selected?.name,
+      })
       if (selected) handleFile(selected)
+      // Always clear to allow selecting the same file again.
+      e.currentTarget.value = ""
     },
     [handleFile]
   )
 
-  const openFilePicker = () => inputRef.current?.click()
+  const triggerFilePicker = (source: "upload-zone" | "replace-button") => {
+    console.log("[Upload][ImageUploader] open file picker", { source })
+    if (inputRef.current) {
+      // Reset value so selecting the same file still fires the change event.
+      inputRef.current.value = ""
+      inputRef.current.click()
+    }
+  }
+
+  const handleRemoveClick = () => {
+    console.log("[Upload][ImageUploader] remove file clicked", {
+      currentFile: file?.name ?? null,
+    })
+    onRemove()
+    if (inputRef.current) {
+      inputRef.current.value = ""
+    }
+    // Force a fresh input element after remove to avoid stale browser state.
+    setInputNonce((prev) => prev + 1)
+  }
 
   // Hidden file input
   const fileInput = (
     <input
+      key={inputNonce}
       ref={inputRef}
       type="file"
       accept="image/*"
@@ -72,7 +108,7 @@ export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUp
         {fileInput}
         <button
           type="button"
-          onClick={openFilePicker}
+          onClick={() => triggerFilePicker("upload-zone")}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -156,7 +192,7 @@ export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUp
       <div className="flex w-full gap-3">
         <button
           type="button"
-          onClick={openFilePicker}
+          onClick={() => triggerFilePicker("replace-button")}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(91,63,191,0.25)] bg-[rgba(91,63,191,0.08)] px-4 py-3 text-sm font-medium text-[#A994E0] backdrop-blur-sm transition-all hover:border-[rgba(91,63,191,0.45)] hover:bg-[rgba(91,63,191,0.15)] hover:text-white"
         >
           <RefreshCw className="h-4 w-4" />
@@ -164,7 +200,7 @@ export function ImageUploader({ file, preview, onFileSelect, onRemove }: ImageUp
         </button>
         <button
           type="button"
-          onClick={onRemove}
+          onClick={handleRemoveClick}
           className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[rgba(212,70,126,0.2)] bg-[rgba(212,70,126,0.06)] px-4 py-3 text-sm font-medium text-[#D4467E] backdrop-blur-sm transition-all hover:border-[rgba(212,70,126,0.4)] hover:bg-[rgba(212,70,126,0.12)]"
         >
           <Trash2 className="h-4 w-4" />

@@ -14,11 +14,43 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 
 
+def _coerce_bool(value) -> bool:
+    """Convert mixed JSON/LLM boolean forms into a strict bool."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "yes", "1"}:
+            return True
+        if normalized in {"false", "no", "0", "", "none", "null"}:
+            return False
+    return False
+
+
+def _normalize_gender(value: str) -> str:
+    normalized = (value or "").strip().lower()
+    if normalized in {"male", "man", "boy", "masculine"}:
+        return "Male"
+    if normalized in {"female", "woman", "girl", "feminine"}:
+        return "Female"
+    return "Unknown/Not clear"
+
+
+def _coerce_confidence(value) -> float:
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return max(0.0, min(1.0, confidence))
+
+
 def parse_ai_json(raw_text: str) -> dict:
     """Parse model output into strict JSON structure."""
     cleaned = (raw_text or "").strip()
 
-    fenced_match = re.search(r"```(?:json)?\\s*(\{.*?\})\\s*```", cleaned, flags=re.DOTALL)
+    fenced_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", cleaned, flags=re.DOTALL)
     if fenced_match:
         cleaned = fenced_match.group(1)
 
@@ -29,18 +61,23 @@ def parse_ai_json(raw_text: str) -> dict:
 
     parsed = json.loads(cleaned)
 
-    person_detected = bool(parsed.get("person_detected", False))
-    face_detected = bool(parsed.get("face_detected", False))
-    gender = str(parsed.get("perceived_gender", "Unknown/Not clear")).strip() or "Unknown/Not clear"
+    person_detected = _coerce_bool(parsed.get("person_detected", False))
+    face_detected = _coerce_bool(parsed.get("face_detected", False))
+    gender = _normalize_gender(str(parsed.get("perceived_gender", "")))
+    gender_confidence = _coerce_confidence(parsed.get("gender_confidence", 0))
 
-    allowed_genders = {"Male", "Female", "Unknown/Not clear"}
-    if gender not in allowed_genders:
+    # Safety rule: if no person/face was detected, gender cannot be reliable.
+    if not person_detected or not face_detected:
+        gender = "Unknown/Not clear"
+    # Conservative threshold to reduce false Male/Female labels.
+    elif gender_confidence < 0.9:
         gender = "Unknown/Not clear"
 
     return {
         "person_detected": person_detected,
         "face_detected": face_detected,
         "perceived_gender": gender,
+        "gender_confidence": gender_confidence,
     }
 
 
@@ -57,7 +94,11 @@ def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
     prompt = (
         "Analyze this image and respond with ONLY valid JSON (no markdown, no extra text). "
         "Use exactly these keys: person_detected (boolean), face_detected (boolean), "
-        "perceived_gender (string: 'Male', 'Female', or 'Unknown/Not clear')."
+        "perceived_gender (string: 'Male', 'Female', or 'Unknown/Not clear'), "
+        "gender_confidence (number between 0 and 1). "
+        "If there is no clear human person or no clear face, set person_detected=false, "
+        "face_detected=false, perceived_gender='Unknown/Not clear', and gender_confidence=0. "
+        "Do NOT guess gender when uncertain. Prefer 'Unknown/Not clear' over a weak guess."
     )
 
     model = genai.GenerativeModel("models/gemini-2.0-flash")
@@ -68,9 +109,16 @@ def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
             "data": image_bytes,
         },
     ]
+    generation_config = {
+        "temperature": 0,
+        "response_mime_type": "application/json",
+    }
 
     try:
-        response = model.generate_content(payload)
+        response = model.generate_content(
+            payload,
+            generation_config=generation_config,
+        )
     except Exception as e:
         error_message = str(e)
         is_quota_error = (
@@ -83,7 +131,10 @@ def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
             logger.warning("Gemini quota/rate limit hit (429). Retrying once in 2 seconds...")
             time.sleep(2)
             try:
-                response = model.generate_content(payload)
+                response = model.generate_content(
+                    payload,
+                    generation_config=generation_config,
+                )
             except Exception as retry_error:
                 logger.error("Gemini analysis retry failed after 429: %s", retry_error)
                 print(f"Gemini analysis failed after retry (429): {retry_error}")
@@ -93,7 +144,20 @@ def analyze_image_with_gemini(image_bytes: bytes, mime_type: str) -> dict:
             print(f"Gemini analysis failed: {e}")
             raise
 
-    return parse_ai_json(response.text or "")
+    raw_text = response.text or ""
+    try:
+        parsed = parse_ai_json(raw_text)
+    except Exception:
+        logger.exception("Failed to parse Gemini response text: %r", raw_text)
+        raise
+
+    logger.info(
+        "AI analysis parsed: person=%s face=%s gender=%s",
+        parsed["person_detected"],
+        parsed["face_detected"],
+        parsed["perceived_gender"],
+    )
+    return parsed
 
 
 def _extract_image_bytes_from_response(response) -> bytes:
